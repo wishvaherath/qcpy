@@ -1,10 +1,52 @@
 #reimagining fastqc in python
 #WH
-#https://support.illumina.com/help/BaseSpace_OLH_009008/Content/Source/Informatics/BS/QualityScoreEncoding_swBS.htm
-quality_char = """!	"	#	$	%	&	'	(	)	*	+	,	-	.	/	0	1	2	3	4	5	6	7	8	9	:	;	<	=	>	?	@	A	B	C	D	E	F	G	H	I""".strip().split()
 
-quality_value = """0	1	2	3	4	5	6	7	8	9	10	11	12	13	14	15	16	17	18	19	20	21	22	23	24	25	26	27	28	29	30	31	32	33	34	35	36	37	38	39	40""".strip().split()
 
-qual_dict = dict(zip(quality_char, quality_value))
+
+import fileinput
+import sys
+import gzip
+from fastqandfurious import fastqandfurious
+
+# from collections import defaultdict
+# base_qual_dict = defaultdict(list)
+#setting up the qual dict
+
+quality_char = [ord(i) for i in """ !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~"""]
+quality_value = range(len(quality_char))
+quality_dict = dict(zip(quality_char, quality_value))
+
+
+print(quality_dict)
+
+
+
+
+
+
+
+
+bufsize = 20000
+base_qual_dict = {}
+def add_base_qual_dict(qual):
+    for q in qual:
+        if q in base_qual_dict:
+            base_qual_dict[q] = base_qual_dict[q]+ 1
+        else:
+            base_qual_dict[q] = 1
+
+
+with gzip.open(sys.argv[1].strip()) as fh:
+    it = fastqandfurious.readfastq_iter(fh, bufsize, fastqandfurious.entryfunc)
+    for entry in it:
+        header = entry[0]
+        seq = [i for i in entry[1]]
+        qual = [quality_dict[i] for i in entry[2]]
+        add_base_qual_dict(qual)
+
+
+
+
+
 
 
