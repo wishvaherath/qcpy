@@ -9,6 +9,7 @@ from fastqandfurious import fastqandfurious
 
 bufsize = 20000
 import collections
+
 qual_dict = collections.defaultdict(dict)
 #d['dict1']['innerkey'] = 'value'
 
@@ -19,6 +20,10 @@ from collections import defaultdict
 quality_char = [ord(i)-33 for i in """!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~"""]
 quality_value = range(len(quality_char))
 quality_dict = dict(zip(quality_char, quality_value))
+
+qd = {}
+for i in quality_dict.values():
+    qd[i] = 0
 
 #pupulating the dict with zeros
 #for i in quality_char:
@@ -53,7 +58,7 @@ def add_base_qual_dict2(qual):
         qual_dict[key] = qual_dict[key] + 1
         pos = pos + 1
 
-def add_base_qual_dict(qual):
+def add_base_qual_dict3(qual):
     pos =0
 
     for q in qual:
@@ -64,6 +69,18 @@ def add_base_qual_dict(qual):
                 qual_dict[pos][q] = 1
         else:
             qual_dict[pos][q] = 1
+        pos = pos + 1
+
+def add_base_qual_dict(qual):
+    pos=0
+    for q in qual:
+        if pos in qual_dict:
+            qual_dict[pos][q] = qual_dict[pos][q] + 1
+        else:
+            qual_dict[pos] = qd.copy()
+            qual_dict[pos][q] = 1
+        pos = pos + 1
+
 
 with gzip.open(sys.argv[1].strip()) as fh:
     it = fastqandfurious.readfastq_iter(fh, bufsize, fastqandfurious.entryfunc)
@@ -76,12 +93,23 @@ with gzip.open(sys.argv[1].strip()) as fh:
 
 #per base sequence quality
 #Base   Mean    Median  Lower Quartile  Upp    er Quartile  10th Percentile 90th Percentil    e
-
 """
 qual_freq_arr = list(base_qual_dict.values())
 cs = np.cumsum(qual_freq_arr)
 Qn = np.searchsorted(cs, np.percentile(cs, 75)
 """
+data = {}
+for p in qual_dict.keys():
+    print(p)
+    quality_array = np.array(list(qual_dict[p].values()))
+    print(quality_array)
+    cs = np.cumsum(quality_array)
+    print(cs)
+    q_list = []
+    for i in [10, 25, 50, 75, 90]:
+        q_list.append(np.searchsorted(cs, np.percentile(cs,i)))
 
+    print(p, "->", q_list)
+    data[p] = q_list
 
 
