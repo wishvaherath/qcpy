@@ -1,6 +1,8 @@
 #reimagining fastqc in python
 #WH
 
+from sortedcontainers import SortedList
+import pybloomfilter
 import zlib
 import numpy as np
 import fileinput
@@ -36,21 +38,6 @@ for i in quality_dict.values():
 
 #use dict.get(k, default)
 
-"""
-def add_base_qual_dict2(qual):
-    pos = 0
-    for q in qual:
-        counter = dict_pos_qual_count.get(pos, 0)
-        counter = counter + 1
-        dict_pos_qual_count[pos][
-
-        if dict_pos_qual_count[pos][q]:
-            dict_pos_qual_count[pos][q] = dict_pos_qual_count[pos][q] + 1
-        else:
-            dict_pos_qual_count[pos][q] = 1
-        pos = pos + 1
-
-"""
 
 
 def add_base_qual_dict2(qual):
@@ -94,17 +81,6 @@ def add_base_qual_dict(tile, qual):
             qual_dict[pos][q] = 1
         pos = pos + 1
 
-"""
-def add_base_qual_dict(tile, qual):
-    pos=0
-    for q in qual:
-        if pos in qual_dict:
-            qual_dict[pos][q] = qual_dict[pos][q] + 1
-        else:
-            qual_dict[pos] = qd.copy()
-            qual_dict[pos][q] = 1
-        pos = pos + 1
-"""
 
 avg_qual_count_dict = {}
 def avg_qual_count(qual):
@@ -126,17 +102,24 @@ length_dict = collections.defaultdict(int)
 dedup_list = []
 dedup_dict = collections.defaultdict(int)
 dedup_original_dict={}
+
+dedup_sorted_list = SortedList()
 def dedup(bseq):
-    k = zlib.crc32(bseq)
+    # k = zlib.crc32(bseq)
+    k = bseq
     if do_dedup:
         #populate dedup_dict:
         if k not in dedup_list:
-            dedup_list.append(k)
-            dedup_original_dict[k] = bseq
+            dedup_bloom.add(k)
+            # dedup_list.append(k)
+            # dedup_original_dict[k] = bseq
     else:
         #check for dedup
-        if k in dedup_list:
-            dedup_dict[k] = dedup_dict[k] + 1
+        if k not in dedup_bloom:
+            pass
+        else:
+            # dedup_dict[k] = dedup_dict[k] + 1
+            dedup_sorted_list.add(k)
 
 
 def base_level(seq):
@@ -159,6 +142,7 @@ def base_level(seq):
 
 #todo for dict entries with default int they start with 0 not 1. So make sure you add one when processing them in the end. 
 
+dedup_bloom = pybloomfilter.BloomFilter(100010, 0.1, "dedup.bloom")
 read_count = 0
 do_dedup = True
 with gzip.open(sys.argv[1].strip()) as fh:
