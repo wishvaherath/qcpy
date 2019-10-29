@@ -7,8 +7,9 @@ import zlib
 import numpy as np
 import fileinput
 import sys
-import gzip
-from fastqandfurious import fastqandfurious
+# import gzip
+# from fastqandfurious import fastqandfurious
+import dnaio
 
 bufsize = 20000
 import collections
@@ -24,7 +25,9 @@ from collections import defaultdict
 # qual_dict = defaultdict(list)
 #setting up the qual dict
 
-quality_char = [ord(i)-33 for i in """!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~"""]
+
+# quality_char = [ord(i)-33 for i in """!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~"""]
+quality_char = [i for i in """!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~"""]
 quality_value = range(len(quality_char))
 quality_dict = dict(zip(quality_char, quality_value))
 
@@ -106,7 +109,7 @@ dedup_original_dict={}
 dedup_sorted_list = SortedList()
 def dedup(bseq):
     # k = zlib.crc32(bseq)
-    k = bseq
+    k = bseq[0:50]
     if do_dedup:
         #populate dedup_dict:
         if k not in dedup_list:
@@ -145,25 +148,28 @@ def base_level(seq):
 dedup_bloom = pybloomfilter.BloomFilter(100010, 0.1, "dedup.bloom")
 read_count = 0
 do_dedup = True
-with gzip.open(sys.argv[1].strip()) as fh:
-    it = fastqandfurious.readfastq_iter(fh, bufsize, fastqandfurious.entryfunc)
-    for entry in it:
+with dnaio.open(sys.argv[1].strip()) as fh:
+    # it = fastqandfurious.readfastq_iter(fh, bufsize, fastqandfurious.entryfunc)
+    for entry in fh:
         read_count = read_count + 1
         if read_count >100000:
             do_dedup=False
 
         # print(entry[1][10])
-        header = str(entry[0])
+        # header = str(entry[0])
+        header = entry.name
         #extract tile numer
         tile = header.strip().split(":")[4].strip()
         # print(tile)
-        seq = "".join([chr(i) for i in entry[1]])
-        qual = [quality_dict[i] for i in entry[2]]
+        # seq = "".join([chr(i) for i in entry[1]])
+        seq = entry.sequence
+
+        qual = [quality_dict[i] for i in entry.qualities]
 
         add_base_qual_dict(tile, qual)
         avg_qual_count(qual)
         base_level(seq)
-        dedup(entry[1])
+        dedup(entry.sequence)
 
 
 
