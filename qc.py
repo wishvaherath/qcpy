@@ -42,29 +42,6 @@ for i in quality_dict.values():
 #use dict.get(k, default)
 
 
-
-def add_base_qual_dict2(qual):
-    pos = 0
-    for q in qual:
-        # key = str(pos) + "_" + str(q)
-        key = (pos*1000) + q
-        #counter = qual_dict.get(key,  0)
-        qual_dict[key] = qual_dict[key] + 1
-        pos = pos + 1
-
-def add_base_qual_dict3(qual):
-    pos =0
-
-    for q in qual:
-        if pos in qual_dict:
-            if q in qual_dict[pos]:
-                qual_dict[pos][q] = qual_dict[pos][q] + 1
-            else:
-                qual_dict[pos][q] = 1
-        else:
-            qual_dict[pos][q] = 1
-        pos = pos + 1
-
 def add_base_qual_dict(tile, qual):
     pos=0
     for q in qual:
@@ -74,12 +51,8 @@ def add_base_qual_dict(tile, qual):
             tile_count_dict[tile][pos] = tile_count_dict[tile][pos] + 1
             qual_dict[pos][q] = qual_dict[pos][q] + 1
         else:
-            # tile_sum_dict[tile] = qd.copy()
-            # tile_sum_dict[tile] = qd.copy()
-
             tile_sum_dict[tile][pos] = q
             tile_count_dict[tile][pos] = 1
-
             qual_dict[pos] = qd.copy()
             qual_dict[pos][q] = 1
         pos = pos + 1
@@ -148,24 +121,19 @@ def base_level(seq):
 dedup_bloom = pybloomfilter.BloomFilter(100010, 0.1, "dedup.bloom")
 read_count = 0
 do_dedup = True
+
 with dnaio.open(sys.argv[1].strip()) as fh:
-    # it = fastqandfurious.readfastq_iter(fh, bufsize, fastqandfurious.entryfunc)
     for entry in fh:
         read_count = read_count + 1
-        if read_count >100000:
+        if read_count > 100000:
+            #this is the sample used for the dedup
             do_dedup=False
-
-        # print(entry[1][10])
-        # header = str(entry[0])
         header = entry.name
         #extract tile numer
         tile = header.strip().split(":")[4].strip()
-        # print(tile)
-        # seq = "".join([chr(i) for i in entry[1]])
         seq = entry.sequence
-
+        #convert qual from char to number
         qual = [quality_dict[i] for i in entry.qualities]
-
         add_base_qual_dict(tile, qual)
         avg_qual_count(qual)
         base_level(seq)
