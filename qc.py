@@ -1,6 +1,8 @@
 #reimagining fastqc in python
 #WH
+
 import time
+import collections
 import queue
 from threading import Thread
 import multiprocessing
@@ -10,63 +12,26 @@ import zlib
 import numpy as np
 import fileinput
 import sys
+
+from collections import defaultdict
 # import gzip
 # from fastqandfurious import fastqandfurious
 import dnaio
 
-bufsize = 20000
-import collections
 
-
-qual_dict = collections.defaultdict(dict)
-tile_sum_dict = collections.defaultdict(dict)
-tile_count_dict = collections.defaultdict(dict)
-
-#d['dict1']['innerkey'] = 'value'
-
-from collections import defaultdict
-# qual_dict = defaultdict(list)
-#setting up the qual dict
-
-
-# quality_char = [ord(i)-33 for i in """!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~"""]
-quality_char = [i for i in """!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~"""]
-quality_value = range(len(quality_char))
-quality_dict = dict(zip(quality_char, quality_value))
-
-
-avg_qual_count_dict = {}
-
-dedup_list = []
-dedup_dict = collections.defaultdict(int)
-dedup_original_dict={}
-
-dedup_sorted_list = SortedList()
-
-
-a_pos_count = collections.defaultdict(int)
-t_pos_count = collections.defaultdict(int)
-g_pos_count = collections.defaultdict(int)
-c_pos_count = collections.defaultdict(int)
-n_pos_count = collections.defaultdict(int)
-
-length_dict = collections.defaultdict(int)
-
-
-
-
-qd = {}
-for i in quality_dict.values():
-    qd[i] = 0
-
-#pupulating the dict with zeros
-#for i in quality_char:
-#    base_qual_dict[i] = 0
-
-#use dict.get(k, default)
 
 def do_qc(in_data):
-    print("called")
+    # print("called")
+    qd = {}
+    quality_char = [i for i in """!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~"""]
+    quality_value = range(len(quality_char))
+    quality_dict = dict(zip(quality_char, quality_value))
+
+
+    for i in quality_dict.values():
+        qd[i] = 0
+
+
     def add_base_qual_dict(tile_listz, qual_listz):
         qual_dict = collections.defaultdict(dict)
         tile_sum_dict = collections.defaultdict(dict)
@@ -164,7 +129,7 @@ def do_qc(in_data):
         print('done')
         #sys.exit(0)
     (seq_listz, qual_listz, tile_listz) = in_data
-    print("sent")
+    # print("sent")
     return [add_base_qual_dict(tile_listz, qual_listz), avg_qual_count(qual_listz), base_level(seq_listz)]
 
 
@@ -174,6 +139,12 @@ def do_qc(in_data):
 
 
 def read_fastq(fn):
+
+    quality_char = [i for i in """!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~"""]
+    quality_value = range(len(quality_char))
+    quality_dict = dict(zip(quality_char, quality_value))
+
+
     tile_list = []
     seq_list = []
     qual_list = []
@@ -198,7 +169,7 @@ def read_fastq(fn):
 
             count = count + 1
             read_count = read_count + 1
-            if read_count > 10000:
+            if read_count > 1000:
                 #this is the sample used for the dedup
                 add_bloom=False
 
@@ -207,8 +178,8 @@ def read_fastq(fn):
                 if k not in dedup_list:
                     dedup_bloom.add(k)
                     dedup_list.append(k)
-            if count == 10000:
-                print("dispatching")
+            if count == 1000:
+                # print("dispatching")
                 data_queue.put((seq_list, qual_list, tile_list))
 
                 # add_base_qual_dict(tile_list, qual_list)
@@ -231,6 +202,54 @@ def read_fastq(fn):
 
 
 if __name__ == "__main__":
+
+    # qual_dict = collections.defaultdict(dict)
+    # tile_sum_dict = collections.defaultdict(dict)
+    # tile_count_dict = collections.defaultdict(dict)
+
+    #d['dict1']['innerkey'] = 'value'
+
+    # qual_dict = defaultdict(list)
+    #setting up the qual dict
+
+
+    # quality_char = [ord(i)-33 for i in """!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~"""]
+    # quality_char = [i for i in """!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~"""]
+    # quality_value = range(len(quality_char))
+    # quality_dict = dict(zip(quality_char, quality_value))
+
+
+    # avg_qual_count_dict = {}
+
+    # dedup_list = []
+    # dedup_dict = collections.defaultdict(int)
+    # dedup_original_dict={}
+
+    # dedup_sorted_list = SortedList()
+
+
+    # a_pos_count = collections.defaultdict(int)
+    # t_pos_count = collections.defaultdict(int)
+    # g_pos_count = collections.defaultdict(int)
+    # c_pos_count = collections.defaultdict(int)
+    # n_pos_count = collections.defaultdict(int)
+
+    # length_dict = collections.defaultdict(int)
+
+
+
+
+    # qd = {}
+    # for i in quality_dict.values():
+    #     qd[i] = 0
+
+    #pupulating the dict with zeros
+    #for i in quality_char:
+    #    base_qual_dict[i] = 0
+
+    #use dict.get(k, default)
+
+
     #todo for dict entries with default int they start with 0 not 1. So make sure you add one when processing them in the end. 
 
     dedup_bloom = pybloomfilter.BloomFilter(100010, 0.1, "dedup.bloom")
@@ -299,6 +318,7 @@ if __name__ == "__main__":
 
 
 
+sys.exit(1)
 
 
 print("per base sequence quality")
