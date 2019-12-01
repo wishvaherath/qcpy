@@ -1,6 +1,6 @@
 #reimagining fastqc in python
 #WH
-
+import pandas
 import time
 import collections
 import queue
@@ -52,7 +52,7 @@ def do_qc(in_data):
                     qual_dict[pos][q] = 1
                 pos = pos + 1
 
-        return (qual_dict, tile_sum_dict, tile_count_dict)
+        return [qual_dict, tile_sum_dict, tile_count_dict]
 
 
     def avg_qual_count(qual_listz):
@@ -66,7 +66,7 @@ def do_qc(in_data):
             else:
                 avg_qual_count_dict[m] = 1
 
-        return avg_qual_count_dict
+        return [avg_qual_count_dict]
 
 
     def dedup(bseq):
@@ -123,15 +123,18 @@ def do_qc(in_data):
                     n_pos_count[pos] = n_pos_count[pos] + 1
                 pos = pos + 1
 
-        return (a_pos_count, t_pos_count, g_pos_count, c_pos_count, n_pos_count, length_dict)
+        return [a_pos_count, t_pos_count, g_pos_count, c_pos_count, n_pos_count, length_dict]
 
     if in_data =="EMPTY":
         print('done')
         #sys.exit(0)
     (seq_listz, qual_listz, tile_listz) = in_data
     # print("sent")
-    return [add_base_qual_dict(tile_listz, qual_listz), avg_qual_count(qual_listz), base_level(seq_listz)]
 
+    #return [add_base_qual_dict(tile_listz, qual_listz), avg_qual_count(qual_listz), base_level(seq_listz)]
+
+    # print(len(add_base_qual_dict(tile_listz, qual_listz) + avg_qual_count(qual_listz) + base_level(seq_listz)))
+    return add_base_qual_dict(tile_listz, qual_listz) + avg_qual_count(qual_listz) + base_level(seq_listz)
 
 
 
@@ -199,58 +202,77 @@ def read_fastq(fn):
     sys.exit(1)
 
 
+def join_dict(one,two, level=0):
+    """
+    joins two dictionaries with one key
+    """
+    if level == 0 :
+        #autodetermine the type
+        if type(one) == dict:
+            #standard dict
+            level = 1
+        elif type(one) == collections.defaultdict:
+            if one.default_factory == dict:
+                level =2
+            else:
+                level=1
+
+    if level == 1:
+        return pandas.Series(one).add(pandas.Series(two), fill_value=0)
+    elif level == 2:
+        return collections.defaultdict(dict, pandas.DataFrame(one).add(pandas.DataFrame(two), fill_value=0).to_dict())
+
+
+def merge_results(m_results, results):
+
+
+    [m_qual_dict, m_tile_sum_dict, m_tile_count_dict, m_avg_qual_count_dict, m_a_pos_count, m_t_pos_count, m_g_pos_count, m_c_pos_count, m_n_pos_count, m_length_dict] = m_results
+    [qual_dict, tile_sum_dict, tile_count_dict, avg_qual_count_dict, a_pos_count, t_pos_count, g_pos_count, c_pos_count, n_pos_count, length_dict] = results
+
+
+    #[(m_qual_dict, m_tile_sum_dict, m_tile_count_dict), m_avg_qual_count_dict, (m_a_pos_count, m_t_pos_count, m_g_pos_count, m_c_pos_count, m_n_pos_count, m_length_dict)] = m_results
+    #[(qual_dict, tile_sum_dict, tile_count_dict), avg_qual_count_dict, (a_pos_count, t_pos_count, g_pos_count, c_pos_count, n_pos_count, length_dict)] = results
+
+
+    m_qual_dict = join_dict(m_qual_dict, qual_dict)
+    m_tile_sum_dict = join_dict(m_tile_sum_dict, tile_sum_dict)
+
+    m_tile_count_dict=join_dict(m_tile_count_dict, tile_count_dict)
+    m_avg_qual_count_dict=join_dict(m_avg_qual_count_dict, avg_qual_count_dict)
+    m_a_pos_count = join_dict(m_a_pos_count, a_pos_count)
+    m_t_pos_count = join_dict(m_t_pos_count, t_pos_count)
+    m_g_pos_count = join_dict(m_g_pos_count, g_pos_count)
+    m_c_pos_count = join_dict(m_c_pos_count, c_pos_count)
+    m_n_pos_count = join_dict(m_n_pos_count, n_pos_count)
+    m_length_dict = join_dict(m_length_dict, length_dict)
+
+    return  [m_qual_dict, m_tile_sum_dict, m_tile_count_dict, m_avg_qual_count_dict, m_a_pos_count, m_t_pos_count, m_g_pos_count, m_c_pos_count, m_n_pos_count, m_length_dict]
+
+
 
 
 if __name__ == "__main__":
-
-    # qual_dict = collections.defaultdict(dict)
-    # tile_sum_dict = collections.defaultdict(dict)
-    # tile_count_dict = collections.defaultdict(dict)
-
-    #d['dict1']['innerkey'] = 'value'
-
-    # qual_dict = defaultdict(list)
-    #setting up the qual dict
-
-
-    # quality_char = [ord(i)-33 for i in """!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~"""]
-    # quality_char = [i for i in """!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~"""]
-    # quality_value = range(len(quality_char))
-    # quality_dict = dict(zip(quality_char, quality_value))
-
-
-    # avg_qual_count_dict = {}
-
-    # dedup_list = []
-    # dedup_dict = collections.defaultdict(int)
-    # dedup_original_dict={}
-
-    # dedup_sorted_list = SortedList()
-
-
-    # a_pos_count = collections.defaultdict(int)
-    # t_pos_count = collections.defaultdict(int)
-    # g_pos_count = collections.defaultdict(int)
-    # c_pos_count = collections.defaultdict(int)
-    # n_pos_count = collections.defaultdict(int)
-
-    # length_dict = collections.defaultdict(int)
-
-
-
-
-    # qd = {}
-    # for i in quality_dict.values():
-    #     qd[i] = 0
-
-    #pupulating the dict with zeros
-    #for i in quality_char:
-    #    base_qual_dict[i] = 0
-
-    #use dict.get(k, default)
-
-
     #todo for dict entries with default int they start with 0 not 1. So make sure you add one when processing them in the end. 
+
+    m_qual_dict = collections.defaultdict(dict)
+    m_tile_sum_dict = collections.defaultdict(dict)
+    m_tile_count_dict = collections.defaultdict(dict)
+    m_avg_qual_count_dict = {}
+    m_a_pos_count = collections.defaultdict(int)
+    m_t_pos_count = collections.defaultdict(int)
+    m_g_pos_count = collections.defaultdict(int)
+    m_c_pos_count = collections.defaultdict(int)
+    m_n_pos_count = collections.defaultdict(int)
+    m_length_dict = collections.defaultdict(int)
+
+
+
+    m_results = [m_qual_dict, m_tile_sum_dict, m_tile_count_dict, m_avg_qual_count_dict, m_a_pos_count, m_t_pos_count, m_g_pos_count, m_c_pos_count, m_n_pos_count, m_length_dict]
+
+
+
+
+
 
     dedup_bloom = pybloomfilter.BloomFilter(100010, 0.1, "dedup.bloom")
     read_count = 0
@@ -262,7 +284,7 @@ if __name__ == "__main__":
     # seq_list = []
     # qual_list = []
 
-    pool = multiprocessing.Pool(processes=8)
+    pool = multiprocessing.Pool(processes=4)
     data_queue = queue.Queue()
 
 
@@ -282,12 +304,16 @@ if __name__ == "__main__":
                 print("empty detected in main loop")
                 if len(data_buffer) > 0:
                     results = poolmap(do_qc, data_buffer)
+
+                    m_results = merge_results(m_results, results)
                 break
             else:
                 data_buffer.append(temp_data)
 
                 if len(data_buffer) == 4:
-                    results = pool.map(do_qc, data_buffer)
+                    results_4 = pool.map(do_qc, data_buffer)
+                    for r in results_4:
+                        m_results = merge_results(m_results, r)
                     data_buffer = []
 
 
@@ -311,7 +337,6 @@ if __name__ == "__main__":
         #        sys.exit(1)
         #        # results = pool.map(do_qc, temp_data)
         #        #reader.join()
-
 
 
 
