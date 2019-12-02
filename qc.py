@@ -18,6 +18,9 @@ from collections import defaultdict
 # from fastqandfurious import fastqandfurious
 import dnaio
 
+config = collections.defaultdict(dict)
+
+config['
 
 def do_qc(in_data):
 
