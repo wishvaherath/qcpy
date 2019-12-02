@@ -1,6 +1,6 @@
 #reimagining fastqc in python
 #WH
-
+import pandas
 import time
 import collections
 import queue
@@ -20,9 +20,43 @@ import dnaio
 
 config = collections.defaultdict(dict)
 
-config['
+def parse_config(config_folder):
+    """
+    Parses the files in the Configuration folder
+    """
+    for line in open(config_folder+"/limits.txt"):
+        line = line.strip()
+        if "#" not in line and len(line) != 0:
+            a,b,c=line.strip().split()
+            try:
+                c = int(c)
+            except:
+                c = float(c)
+            config[a][b] = c
+
+    for line in open(config_folder+"/adapter_list.txt"):
+        line = line.strip()
+        if "#" not in line and len(line) != 0:
+            temp = line.split("\t")
+            a = temp[0].strip()
+            b = temp[-1].strip()
+            config["adapter_list"][a] = b.strip()
+
+    for line in open(config_folder+"/contaminant_list.txt"):
+        line = line.strip()
+        if "#" not in line and len(line) != 0:
+            temp = line.split("\t")
+            a = temp[0].strip()
+            b = temp[-1].strip()
+            config["contaminant_list"][a] = b.strip()
+    return config
+
+
+
+
 
 def do_qc(in_data):
+    #print(config)
 
     #building qual_dict[qual_char] = qual_value to convert qual values to scores
     qd = {}
@@ -63,7 +97,7 @@ def do_qc(in_data):
                     qual_dict[pos] = qd.copy()
                     qual_dict[pos][q] = 1
                 pos = pos + 1
-        return (qual_dict, tile_sum_dict, tile_count_dict)
+        return [qual_dict, tile_sum_dict, tile_count_dict]
 
 
     def avg_qual_count(qual_list):
@@ -80,7 +114,7 @@ def do_qc(in_data):
             else:
                 avg_qual_count_dict[m] = 1
 
-        return avg_qual_count_dict
+        return [avg_qual_count_dict]
 
 
     def dedup(seq_list, bloom_start=0, bloom_stop=50):
@@ -98,6 +132,8 @@ def do_qc(in_data):
             if seq_key not in dedup_bloom:
                 # the sequence is not a duplicate
                 dedup_dict[seq_key] = dedup_dict[seq_key] + 1
+
+        return [dedup_dict]
 
         # k = zlib.crc32(bseq)
         #k = bseq[0:50]
@@ -150,18 +186,28 @@ def do_qc(in_data):
                     n_pos_count[pos] = n_pos_count[pos] + 1
                 pos = pos + 1
 
-        return (a_pos_count, t_pos_count, g_pos_count, c_pos_count, n_pos_count, length_dict)
+        return [a_pos_count, t_pos_count, g_pos_count, c_pos_count, n_pos_count, length_dict]
+
+    def dummy(seq_list):
+        i = 0
+        d = {}
+        for j in seq_list:
+            i = i + 1
+
+        d["count"] = i
+        return [d]
 
     if in_data =="EMPTY":
         print('done')
         #sys.exit(0)
     (seq_list, qual_list, header_list, tile_list) = in_data
     # print("sent")
-    return [add_base_qual_dict(tile_list, qual_list), avg_qual_count(qual_list), base_level(seq_list), dedup(seq_list)]
+
+    return [[add_base_qual_dict(tile_list, qual_list) + avg_qual_count(qual_list) +  base_level(seq_list)+  dedup(seq_list)],[dummy(seq_list)]]
 
 
 
-def read_fastq(fn, chunk_size = 10000 ,bloom_limit = 100000, bloom_start = 0, bloom_stop = 50):
+def read_fastq(fn, chunk_size = 1000 ,bloom_limit = 100000, bloom_start = 0, bloom_stop = 50):
     """
     read given fastq.gz file (fn) and put chunks of reads into data_queue as (seq_list, qual_list, header_list)
 
@@ -217,12 +263,16 @@ def read_fastq(fn, chunk_size = 10000 ,bloom_limit = 100000, bloom_start = 0, bl
                     dedup_list.append(k)
             if count == chunk_size:
                 # chunk size was hit. Adding the chunk to data_queue
-                data_queue.put((seq_list, qual_list, header_list, tile_list))
-                #reset chunk count and lists
-                count = 0
-                tile_list = []
-                seq_list = []
-                qual_list = []
+                if seq_list == []:
+                    pass
+                else:
+                    data_queue.put((seq_list, qual_list, header_list, tile_list))
+                    #reset chunk count and lists
+
+                    count = 0
+                    tile_list = []
+                    seq_list = []
+                    qual_list = []
 
     print("File read complete")
     #The EMPTY flag denotes the end of the read.
@@ -232,7 +282,7 @@ def read_fastq(fn, chunk_size = 10000 ,bloom_limit = 100000, bloom_start = 0, bl
 
 
 
-def join_dict(one,two, level=0):
+def join_dict2(one,two, level=0):
     """
     joins two dictionaries with one key
     """
@@ -252,8 +302,39 @@ def join_dict(one,two, level=0):
     elif level == 2:
         return collections.defaultdict(dict, pandas.DataFrame(one).add(pandas.DataFrame(two), fill_value=0).to_dict())
 
+def join_dict(one,two, level=0):
+    """
+    joins two dictionaries with one key
+    """
+    if level == 0 :
+        #autodetermine the type
+        if type(one) == dict:
+            #standard dict
+            level = 1
+        elif type(one) == collections.defaultdict:
+            if one.default_factory == dict:
+                level =2
+            else:
+                level=1
 
-def merge_results(m_results, results):
+    if level == 1:
+        #standard dict
+        for (k,v) in one.items():
+            if k in two:
+                two[k] = two[k] + v
+            else:
+                two[k] = v
+        return two
+
+    elif level == 2:
+        for (k1,v1) in one.items():
+            for (k2,v2) in v1.items():
+                two[k1][k2] = two[k1][k2] + v2
+        return collections.defaultdict(dict, pandas.DataFrame(one).add(pandas.DataFrame(two), fill_value=0).to_dict())
+
+
+
+def merge_results2(m_results, results):
 
 
     [m_qual_dict, m_tile_sum_dict, m_tile_count_dict, m_avg_qual_count_dict, m_a_pos_count, m_t_pos_count, m_g_pos_count, m_c_pos_count, m_n_pos_count, m_length_dict] = m_results
@@ -279,9 +360,64 @@ def merge_results(m_results, results):
     return  [m_qual_dict, m_tile_sum_dict, m_tile_count_dict, m_avg_qual_count_dict, m_a_pos_count, m_t_pos_count, m_g_pos_count, m_c_pos_count, m_n_pos_count, m_length_dict]
 
 
+def merge_results(results_queue):
+    """
+    collapese the results_queue by combining the dicts.
+    """
+    global merging_complete
+    global final_results
+    while True:
+        time.sleep(1)
+        if results_queue.qsize() > 2:
+            #There are mroe than two entries in the results queue.
+            rr1 = results_queue.get()
+            rr2 = results_queue.get()
+
+            print("merging", len(rr1), len(rr2))
+            if rr1 == "EMPTY":
+                #you cant have this
+                print("rr1 is emptry. ERROR")
+                print(rr2)
+
+            if rr2 == "EMPTY":
+                print("empty recieved by merge_results")
+                #the do_qc process is complete. 
+                #time to wrap up
+                final_results = rr1
+                print("bye from merge_results")
+                merging_complete = True
+                sys.exit(1)
+            print(len(rr1), len(rr2))
+            [[s_r1], [c_r1]] = rr1
+            [[s_r2], [c_r2]] = rr2
+            print(len(rr1), len(rr2), len(s_r1), len(s_r2))
+            # [m1_1,m2_1, m3_1, m4_1, c_r1] = rr1
+            # [m1_2,m2_2, m3_2, m4_2, c_r2] = rr2
+
+
+
+
+
+            s_r3 = []
+            for (d1,d2) in zip(s_r1, s_r2):
+                joined = join_dict(d1,d2)
+                if joined == None:
+                    print ("ERROR", len(s_r1), len(s_r2), len(d1), len(d2))
+                s_r3.append(joined)
+            c_r3 = []
+            for (d1,d2) in zip(c_r1, c_r2):
+                c_r3.append(join_dict(d1,d2))
+
+            results_queue.put([[s_r3],[c_r3]])
+
+
 
 
 if __name__ == "__main__":
+    final_results = []
+    merging_complete = False
+    pool_size = 4
+    config = parse_config("Configuration")
 
     m_qual_dict = collections.defaultdict(dict)
     m_tile_sum_dict = collections.defaultdict(dict)
@@ -309,43 +445,89 @@ if __name__ == "__main__":
     results = []
 
     #setting up the thread to read fastq
-    pool = multiprocessing.Pool(processes=2)
-    data_queue = queue.Queue()
+    pool = multiprocessing.Pool(processes=pool_size)
+
+    #data_queue contains the contents of the def read_fastq output.
+    data_queue = queue.Queue(maxsize=pool_size)
+
+    #results_que contains the contents of the def do_qc output. 
+    results_queue = queue.Queue()
+
     print("initiating")
     reader = Thread(target=read_fastq, args = (sys.argv[1].strip(),))
     # reader.setDaemon(True) #change this to process if you want
     reader.start()
+
+    merger = Thread(target=merge_results, args = (results_queue,))
+    merger.start()
 
     try_to_stop = False
     data_buffer = []
 
     while True:
         time.sleep(1)
+        if merging_complete:
+            sys.exit()
         if data_queue.qsize() > 0:
             #there is stuff in the queue
             temp_data = data_queue.get()
 
             if "EMPTY" in temp_data:
-                print("lengthsdfadsfasd", len(results))
-                print("empty detected in main loop")
-                if len(data_buffer) > 0:
+                #this is the last entry of the do_qc thread.
+                print("File read is complete")
+                #push the rest of the entries to do_qc
 
-                    # results = poolmap(do_qc, data_buffer)
-                    results.append(poolmap(do_qc, data_buffer))
+                results_n = pool.map(do_qc, data_buffer)
+                for r in results_n:
+                    results_queue.put(r)
+                data_buffer = []
 
-                    #m_results = merge_results(m_results, results)
-                    sys.exit(0)
-                    break
-                else:
-                    sys.exit(0)
+                #push "EMPTY to results_queue
+                results_queue.put("EMPTY")
+                print("push empty to merge_results")
+
+
+
+
             else:
                 data_buffer.append(temp_data)
-                if len(data_buffer) == 4:
-                    results_4 = pool.map(do_qc, data_buffer)
-                    for r in results_4:
-                        #m_results = merge_results(m_results, r)
-                        results.append(r)
+                if len(data_buffer) == pool_size:
+                    #there are entries equal to the size of the multiprocessing pool.
+                    #so push it to pool
+                    print("dispatchin do_qc")
+                    results_n = pool.map(do_qc, data_buffer)
+
+                    print("do_qc results recieved", len(results_n))
+                    #clear data buffer
                     data_buffer = []
+                    for r in results_n:
+                        results_queue.put(r)
+
+
+
+
+
+
+
+#                if len(data_buffer) > 0:
+
+#                    # results = poolmap(do_qc, data_buffer)
+#                    results.append(poolmap(do_qc, data_buffer))
+
+#                    #m_results = merge_results(m_results, results)
+#                    sys.exit(0)
+#                    break
+#                else:
+#                    sys.exit(0)
+#            else:
+#                data_buffer.append(temp_data)
+#                if len(data_buffer) == 4:
+#                    results_4 = pool.map(do_qc, data_buffer)
+#                    for r in results_4:
+#                        results_queue.put(r)
+#                        #m_results = merge_results(m_results, r)
+#                        #results.append(r)
+#                    data_buffer = []
 
 
 
@@ -472,4 +654,5 @@ print("Length   Count")
 
 for l in sorted(length_dict):
     print(l, length_dict[l])
+
 
