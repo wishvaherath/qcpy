@@ -6,7 +6,7 @@ import collections
 import queue
 from threading import Thread
 import multiprocessing
-from sortedcontainers import SortedList
+#from sortedcontainers import SortedList
 import pybloomfilter
 import zlib
 import numpy as np
@@ -125,7 +125,7 @@ def do_qc(in_data):
         """
         dedup_dict = collections.defaultdict(int)
 
-        dedup_sorted_list = SortedList()
+        # dedup_sorted_list = SortedList()
 
         for seq in seq_list:
             seq_key = seq[bloom_start:bloom_stop]
@@ -325,8 +325,8 @@ def join_dict(one,two, level=0):
             else:
                 two[k] = v
         return two
-
     elif level == 2:
+        print("length", len(one), len(two))
         for (k1,v1) in one.items():
             for (k2,v2) in v1.items():
                 if k2 in two[k1]:
@@ -345,6 +345,7 @@ def join_dict(one,two, level=0):
                 #     two[k1][k2] = v2
 
         #return collections.defaultdict(dict, pandas.DataFrame(one).add(pandas.DataFrame(two), fill_value=0).to_dict())
+        print("length2", len(two))
         return two
 
 
@@ -435,7 +436,6 @@ def print_stats():
     cs = np.cumsum(qual_freq_arr)
     Qn = np.searchsorted(cs, np.percentile(cs, 75)
     """
-    global qual_dict
     for p in qual_dict.keys():
         # print(p)
         quality_array = np.array(list(qual_dict[p].values()))
@@ -457,7 +457,6 @@ def print_stats():
 
     print("per tile sequence quality")
     print("Tile     Base    Mean")
-
     for tile in tile_count_dict:
         for pos in tile_count_dict[tile]:
             m = tile_sum_dict[tile][pos] / tile_count_dict[tile][pos]
@@ -562,6 +561,8 @@ if __name__ == "__main__":
         time.sleep(1)
         if merging_complete:
             #print_stats()
+            print(results_queue.get())
+            print(results_queue.qsize())
 
             sys.exit()
         if data_queue.qsize() > 0:
