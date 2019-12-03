@@ -329,11 +329,20 @@ def join_dict(one,two, level=0):
     elif level == 2:
         for (k1,v1) in one.items():
             for (k2,v2) in v1.items():
-                try:
+                if k2 in two[k1]:
                     two[k1][k2] = two[k1][k2] + v2
-                except:
-                    print("KEY error", k1, k2,v2)
+                else:
                     two[k1][k2] = v2
+
+
+                # try:
+                #     two[k1][k2] = two[k1][k2] + v2
+                # except:
+                #     print("KEY error", k1, k2,v2, type(one), one.default_factory, type(two), two.default_factory, v2)
+                #     print(one[k1].keys())
+                #     print(two[k1].keys())
+                #     print(v1)
+                #     two[k1][k2] = v2
 
         #return collections.defaultdict(dict, pandas.DataFrame(one).add(pandas.DataFrame(two), fill_value=0).to_dict())
         return two
@@ -417,6 +426,85 @@ def merge_results(results_queue):
             results_queue.put([[s_r3],[c_r3]])
 
 
+def print_stats():
+
+    print("per base sequence quality")
+    print("Base   Mean    Median  Lower Quartile  Upper Quartile  10th Percentile 90th Percentile")
+    """
+    qual_freq_arr = list(base_qual_dict.values())
+    cs = np.cumsum(qual_freq_arr)
+    Qn = np.searchsorted(cs, np.percentile(cs, 75)
+    """
+    global qual_dict
+    for p in qual_dict.keys():
+        # print(p)
+        quality_array = np.array(list(qual_dict[p].values()))
+        # print(quality_array)
+        cs = np.cumsum(quality_array)
+        # print(cs)
+        q_list = []
+        for i in [10, 25, 50, 75, 90]:
+            q_list.append(np.searchsorted(cs, np.percentile(cs,i)))
+
+        # print(p, "->", q_list)
+        #calculate mean
+        quality_key = np.array(list(qual_dict[p].keys()))
+        total = np.sum(quality_key*quality_array)
+        quality_mean = total / np.sum(quality_array)
+
+        print(p, quality_mean, q_list[0], q_list[1], q_list[2], q_list[3])
+
+
+    print("per tile sequence quality")
+    print("Tile     Base    Mean")
+
+    for tile in tile_count_dict:
+        for pos in tile_count_dict[tile]:
+            m = tile_sum_dict[tile][pos] / tile_count_dict[tile][pos]
+            print(tile, pos, m)
+
+    print("Per sequence quality scores")
+    print("Quality  Count")
+    for q in sorted(avg_qual_count_dict):
+        print(q, avg_qual_count_dict[q])
+
+    print("Per base sequence content")
+    print("Base G   A   T   C")
+
+    for p in sorted(a_pos_count):
+        a = a_pos_count[p]
+        t = t_pos_count[p]
+        g = g_pos_count[p]
+        c = c_pos_count[p]
+        n = n_pos_count[p]
+
+        ff = (a+t+g+c+n) / 100
+
+        print(p, g/ff, a/ff, t/ff, c/ff)
+
+    print("Per sequence GC content")
+    print("GC Content   count")
+    for p in sorted(a_pos_count):
+        a = a_pos_count[p]
+        t = t_pos_count[p]
+        g = g_pos_count[p]
+        c = c_pos_count[p]
+        n = n_pos_count[p]
+
+        gc = (g+c)/(a+t) * 100
+        print(p, gc)
+
+    print("Per base N content")
+    print("Base N-Count")
+    for p in sorted(n_pos_count):
+        print(p, n_pos_count[p])
+
+    print("Sequence Length Distribution")
+    print("Length   Count")
+
+    for l in sorted(length_dict):
+        print(l, length_dict[l])
+
 
 
 if __name__ == "__main__":
@@ -473,6 +561,8 @@ if __name__ == "__main__":
     while True:
         time.sleep(1)
         if merging_complete:
+            #print_stats()
+
             sys.exit()
         if data_queue.qsize() > 0:
             #there is stuff in the queue
@@ -582,83 +672,6 @@ if __name__ == "__main__":
 
 
 print(len(results))
-sys.exit(1)
-
-
-print("per base sequence quality")
-print("Base   Mean    Median  Lower Quartile  Upper Quartile  10th Percentile 90th Percentile")
-"""
-qual_freq_arr = list(base_qual_dict.values())
-cs = np.cumsum(qual_freq_arr)
-Qn = np.searchsorted(cs, np.percentile(cs, 75)
-"""
-for p in qual_dict.keys():
-    # print(p)
-    quality_array = np.array(list(qual_dict[p].values()))
-    # print(quality_array)
-    cs = np.cumsum(quality_array)
-    # print(cs)
-    q_list = []
-    for i in [10, 25, 50, 75, 90]:
-        q_list.append(np.searchsorted(cs, np.percentile(cs,i)))
-
-    # print(p, "->", q_list)
-    #calculate mean
-    quality_key = np.array(list(qual_dict[p].keys()))
-    total = np.sum(quality_key*quality_array)
-    quality_mean = total / np.sum(quality_array)
-
-    print(p, quality_mean, q_list[0], q_list[1], q_list[2], q_list[3])
-
-
-print("per tile sequence quality")
-print("Tile     Base    Mean")
-
-for tile in tile_count_dict:
-    for pos in tile_count_dict[tile]:
-        m = tile_sum_dict[tile][pos] / tile_count_dict[tile][pos]
-        print(tile, pos, m)
-
-print("Per sequence quality scores")
-print("Quality  Count")
-for q in sorted(avg_qual_count_dict):
-    print(q, avg_qual_count_dict[q])
-
-print("Per base sequence content")
-print("Base G   A   T   C")
-
-for p in sorted(a_pos_count):
-    a = a_pos_count[p]
-    t = t_pos_count[p]
-    g = g_pos_count[p]
-    c = c_pos_count[p]
-    n = n_pos_count[p]
-
-    ff = (a+t+g+c+n) / 100
-
-    print(p, g/ff, a/ff, t/ff, c/ff)
-
-print("Per sequence GC content")
-print("GC Content   count")
-for p in sorted(a_pos_count):
-    a = a_pos_count[p]
-    t = t_pos_count[p]
-    g = g_pos_count[p]
-    c = c_pos_count[p]
-    n = n_pos_count[p]
-
-    gc = (g+c)/(a+t) * 100
-    print(p, gc)
-
-print("Per base N content")
-print("Base N-Count")
-for p in sorted(n_pos_count):
-    print(p, n_pos_count[p])
-
-print("Sequence Length Distribution")
-print("Length   Count")
-
-for l in sorted(length_dict):
-    print(l, length_dict[l])
+#sys.exit(1)
 
 
