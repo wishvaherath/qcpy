@@ -207,7 +207,7 @@ def do_qc(in_data):
 
 
 
-def read_fastq(fn, chunk_size = 1000 ,bloom_limit = 100000, bloom_start = 0, bloom_stop = 50):
+def read_fastq(fn, chunk_size = 10000 ,bloom_limit = 100000, bloom_start = 0, bloom_stop = 50):
     """
     read given fastq.gz file (fn) and put chunks of reads into data_queue as (seq_list, qual_list, header_list)
 
@@ -329,8 +329,14 @@ def join_dict(one,two, level=0):
     elif level == 2:
         for (k1,v1) in one.items():
             for (k2,v2) in v1.items():
-                two[k1][k2] = two[k1][k2] + v2
-        return collections.defaultdict(dict, pandas.DataFrame(one).add(pandas.DataFrame(two), fill_value=0).to_dict())
+                try:
+                    two[k1][k2] = two[k1][k2] + v2
+                except:
+                    print("KEY error", k1, k2,v2)
+                    two[k1][k2] = v2
+
+        #return collections.defaultdict(dict, pandas.DataFrame(one).add(pandas.DataFrame(two), fill_value=0).to_dict())
+        return two
 
 
 
@@ -377,7 +383,7 @@ def merge_results(results_queue):
             if rr1 == "EMPTY":
                 #you cant have this
                 print("rr1 is emptry. ERROR")
-                print(rr2)
+                #print(rr2)
 
             if rr2 == "EMPTY":
                 print("empty recieved by merge_results")
@@ -387,10 +393,10 @@ def merge_results(results_queue):
                 print("bye from merge_results")
                 merging_complete = True
                 sys.exit(1)
-            print(len(rr1), len(rr2))
+            #print(len(rr1), len(rr2))
             [[s_r1], [c_r1]] = rr1
             [[s_r2], [c_r2]] = rr2
-            print(len(rr1), len(rr2), len(s_r1), len(s_r2))
+            #print(len(rr1), len(rr2), len(s_r1), len(s_r2))
             # [m1_1,m2_1, m3_1, m4_1, c_r1] = rr1
             # [m1_2,m2_2, m3_2, m4_2, c_r2] = rr2
 
