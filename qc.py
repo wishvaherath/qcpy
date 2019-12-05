@@ -118,24 +118,35 @@ def do_qc(in_data):
 
 
     def dedup(seq_list, bloom_start=0, bloom_stop=50):
-        """
-        Propogates dedup_dict[sequence_key] = count for duplicated sequences.
-        sequence_key = seq[bloom_start:bloom_stop]
+            """
+            Propogates dedup_dict[sequence_key] = count for duplicated sequences.
+            sequence_key = seq[bloom_start:bloom_stop]
 
-        """
-        dedup_dict = collections.defaultdict(int)
+            """
+            global add_bloom
+            global dedup_bloom
+            dedup_dict = collections.defaultdict(int)
+            if add_bloom:
+                #the bloom filter is still being propogated
+                #so ignore
+                return [dedup_dict]
 
-        # dedup_sorted_list = SortedList()
+            # dedup_sorted_list = SortedList()
 
-        for seq in seq_list:
-            seq_key = seq[bloom_start:bloom_stop]
-            if seq_key not in dedup_bloom:
-                # the sequence is not a duplicate
-                dedup_dict[seq_key] = dedup_dict[seq_key] + 1
+            for seq in seq_list:
+                seq_key = seq[bloom_start:bloom_stop]
+                if seq_key not in dedup_bloom:
+                    pass
+                else:
+                    # the sequence is a duplicate
+                    dedup_dict[seq_key] = dedup_dict[seq_key] + 1
 
-        return [dedup_dict]
+            print("dedup")
+            print(dedup_dict)
+            return [dedup_dict]
 
-        # k = zlib.crc32(bseq)
+
+            # k = zlib.crc32(bseq)
         #k = bseq[0:50]
         #if do_dedup:
         #    #populate dedup_dict:
@@ -207,7 +218,7 @@ def do_qc(in_data):
 
 
 
-def read_fastq(fn, chunk_size = 10000 ,bloom_limit = 100000, bloom_start = 0, bloom_stop = 50):
+def read_fastq(fn, chunk_size = 10000 ,bloom_limit = 10000, bloom_start = 0, bloom_stop = 50):
     """
     read given fastq.gz file (fn) and put chunks of reads into data_queue as (seq_list, qual_list, header_list)
 
@@ -227,7 +238,8 @@ def read_fastq(fn, chunk_size = 10000 ,bloom_limit = 100000, bloom_start = 0, bl
     header_list = []
     count = 0
     read_count = 0
-    add_bloom = False
+    dedup_list = []
+    global add_bloom #default is True
 
 
     with dnaio.open(fn) as fh:
@@ -257,7 +269,7 @@ def read_fastq(fn, chunk_size = 10000 ,bloom_limit = 100000, bloom_start = 0, bl
 
 
             if add_bloom:
-                k = seq[bloom_start:bloom_length]
+                k = seq[bloom_start:bloom_stop]
                 if k not in dedup_list:
                     dedup_bloom.add(k)
                     dedup_list.append(k)
@@ -307,7 +319,7 @@ def join_dict(one,two, level=0):
     joins two dictionaries with one key
     """
     if level == 0 :
-        #autodetermine the type
+        #rautodetermine the type
         if type(one) == dict:
             #standard dict
             level = 1
@@ -319,14 +331,16 @@ def join_dict(one,two, level=0):
 
     if level == 1:
         #standard dict
+        # print("level1")
         for (k,v) in one.items():
             if k in two:
                 two[k] = two[k] + v
             else:
                 two[k] = v
+        # print("lvl1", len(one), len(two))
         return two
     elif level == 2:
-        print("length", len(one), len(two))
+        # print("length", len(one), len(two))
         for (k1,v1) in one.items():
             for (k2,v2) in v1.items():
                 if k2 in two[k1]:
@@ -345,7 +359,7 @@ def join_dict(one,two, level=0):
                 #     two[k1][k2] = v2
 
         #return collections.defaultdict(dict, pandas.DataFrame(one).add(pandas.DataFrame(two), fill_value=0).to_dict())
-        print("length2", len(two))
+        # print("length2", len(two))
         return two
 
 
@@ -389,7 +403,7 @@ def merge_results(results_queue):
             rr1 = results_queue.get()
             rr2 = results_queue.get()
 
-            print("merging", len(rr1), len(rr2))
+            # print("merging", len(rr1), len(rr2))
             if rr1 == "EMPTY":
                 #you cant have this
                 print("rr1 is emptry. ERROR")
@@ -505,8 +519,9 @@ def print_stats():
         print(l, length_dict[l])
 
 
-
 if __name__ == "__main__":
+    add_bloom = True
+
     final_results = []
     merging_complete = False
     pool_size = 4
@@ -532,7 +547,6 @@ if __name__ == "__main__":
     dedup_bloom = pybloomfilter.BloomFilter(100010, 0.1, "dedup.bloom")
 
     read_count = 0
-    add_bloom = True
     dedup_list = []
     count = 0
     results = []
@@ -541,7 +555,7 @@ if __name__ == "__main__":
     pool = multiprocessing.Pool(processes=pool_size)
 
     #data_queue contains the contents of the def read_fastq output.
-    data_queue = queue.Queue(maxsize=pool_size)
+    data_queue = queue.Queue(maxsize=pool_size*10)
 
     #results_que contains the contents of the def do_qc output. 
     results_queue = queue.Queue()
