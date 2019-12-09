@@ -38,8 +38,7 @@ report_any_name(report, data_pack):
 
 ~~~
 
-### qc.py
-This file contains the multithreaded version of qc.py.
+
 
 *report* is a file handle for the report. Use it to write to it. 
 *data_pack* is a list defined as following.
@@ -50,6 +49,9 @@ This file contains the multithreaded version of qc.py.
 
 
 ~~~
+
+### qc.py
+This file contains the multithreaded version of qc.py.
 
 
 
