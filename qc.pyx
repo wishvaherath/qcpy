@@ -1,4 +1,6 @@
-from extern import *
+# from extern import *
+import inspect
+import extern
 
 # ereimagining fastqc in python
 #WH
@@ -72,7 +74,7 @@ for i in quality_dict.values():
 
 
 @cython.profile(True)
-cpdef iterate_fastq(fn):
+cpdef iterate_fastq(fn, pipe):
 
 
     global read_count
@@ -102,6 +104,17 @@ cpdef iterate_fastq(fn):
             avg_qual_count(qual)
             base_level(seq)
             dedup(entry[1],do_dedup)
+
+            #processing the functions in extern
+            extern_functions = inspect.getmembers(extern, inspect.isfunction) 
+            for (f_name, f) in extern_functions:
+                if "report_" not in f_name:
+                    f(entry[1], qual, header)
+            if pipe:
+                print(str(header))
+                print(str(seq))
+                print(entry[2])
+
 
 
 
